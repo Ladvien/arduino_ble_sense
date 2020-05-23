@@ -5,17 +5,14 @@
 // This device's MAC:
 // C8:5C:A2:2B:61:86
 
-// Create BLE Service.
-BLEService batteryService("1101");
-BLEByteCharacteristic batteryLevelChar("19B10012-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify | BLEBroadcast);
+// BLE Service
+BLEService microphoneService("1101");
+BLEByteCharacteristic microphoneLevelChar("19B10012-E8F2-537E-4F6C-D104768A1214", BLERead | BLENotify | BLEBroadcast);
 
-/* Microphone
- *  
- */
-// buffer to read samples into, each sample is 16-bits
+// Buffer to read samples into, each sample is 16-bits
 short sampleBuffer[256];
 
-// number of samples read
+// Number of samples read
 volatile int samplesRead;
 
 /*
@@ -38,17 +35,23 @@ void setup() {
   // Configure the data receive callback
   PDM.onReceive(onPDMdata);
 
+  // Start PDM
+  startPDM();
+
   // Start BLE.
   startBLE();
-  
-  BLE.setLocalName("BatteryMonitor");
-  BLE.setAdvertisedService(batteryService);
-  batteryService.addCharacteristic(batteryLevelChar);
-  BLE.addService(batteryService);
 
+  // Create BLE service and characteristics.
+  BLE.setLocalName("MicrophoneMonitor");
+  BLE.setAdvertisedService(microphoneService);
+  microphoneService.addCharacteristic(microphoneLevelChar);
+  BLE.addService(microphoneService);
+
+  // Let's tell devices about us.
   BLE.advertise();
   Serial.println("Bluetooth device active, waiting for connections...");
 }
+
 
 void loop()
 {
@@ -58,22 +61,26 @@ void loop()
   {
     Serial.print("Connected to central: ");
     Serial.println(central.address());
+
+    // Only send data if we are connected to a central device.
     while (central.connected()) {
       connectedLight();
-      int battery = analogRead(A0);
-      int batteryLevel = map(battery, 0, 1023, 0, 100);
-//      Serial.print("Battery: ");
-//      Serial.println(batteryLevel);
-      batteryLevelChar.writeValue(batteryLevel);
-//      delay(200);
 
+      // Send the microphone values to the central device.
+      if (samplesRead) {
+        // print samples to the serial monitor or plotter
+        for (int i = 0; i < samplesRead; i++) {
+          microphoneLevelChar.writeValue(sampleBuffer[i]);      
+        }
+        // Clear the read count
+        samplesRead = 0;
+      }
     }
   } else {
     disconnectedLight();
-    Serial.print("Disconnected from central: ");
-    Serial.println(central.address()); 
   }
 }
+
 
 /*
  * Bluetooth
@@ -86,6 +93,7 @@ void startBLE() {
     disconnectedLight();
   }
 }
+
 
 /*
  * Microphone
@@ -116,11 +124,11 @@ void onPDMdata() {
 /*
  * LEDS
  */
-
 void connectedLight() {
   digitalWrite(LEDR, LOW);
   digitalWrite(LEDG, HIGH);
 }
+
 
 void disconnectedLight() {
   digitalWrite(LEDR, HIGH);
