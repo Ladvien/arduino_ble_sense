@@ -45,15 +45,18 @@ def notification_handler(sender, data):
 def disconnect_callback(client, future):
     print(f"Disconnected callback called on {client}!")
 
-async def run(address, loop):
-    async with BleakClient(address, loop = loop) as client:
-        x = await client.is_connected()
+async def cleanup(client):
+    await client.stop_notify(read_characteristic)
+    await client.disconnect()
 
-        client.set_disconnected_callback(disconnect_callback)
-        await client.write_gatt_char(write_characteristic, bytearray([2, 2, 3, 4]))
-        await client.start_notify(read_characteristic, notification_handler)
-        await asyncio.sleep(30.0, loop = loop)
-        await client.stop_notify(read_characteristic)
+
+async def run(client):
+    await client.connect()
+    await client.is_connected()
+    client.set_disconnected_callback(disconnect_callback)
+    await client.start_notify(read_characteristic, notification_handler)
+    while True:
+        await asyncio.sleep(15.0, loop = loop)
 
 #############
 # Main
@@ -67,5 +70,17 @@ if __name__ == "__main__":
     address = (
         "C8:5C:A2:2B:61:86"
     )
+    
+    # Create the event loop.
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(run(address, loop))
+    
+    # Create the Bluetooth LE object.
+    client = BleakClient(address, loop = loop)
+    try:
+        loop.run_until_complete(run(client))
+    except KeyboardInterrupt:
+        print()
+        print('User stopped program.')
+    finally:
+        print('Disconnecting...')
+        loop.run_until_complete(cleanup(client))
