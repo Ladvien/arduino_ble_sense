@@ -1,20 +1,18 @@
-import logging
-
-
 # https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/
+import os, sys
 import asyncio
 import platform
 from datetime import datetime
 from aioconsole import ainput
 
 from bleak import BleakClient
-from bleak import _logger as logger
+
+root_path = os.environ['HOME']
 
 #############
 # Parameters
 #############
-
-output_file             = '/home/ladvien/Desktop/microphone_dump.csv'
+output_file             = f'{root_path}/Desktop/microphone_dump.csv'
 
 read_characteristic     = '00001143-0000-1000-8000-00805f9b34fb'
 write_characteristic    = '00001142-0000-1000-8000-00805f9b34fb'
@@ -103,15 +101,18 @@ timestamps = []
 delays = []
 
 if __name__ == "__main__":
-    import os
 
-    address = (
-        "C8:5C:A2:2B:61:86"
-    )
+    # Get OS name.
+    os_name = sys.platform
+
+    if os_name == 'darwin': # Mac uses CBID.
+        address = ('C24E11AE-0009-4C5D-9938-6456CBD09A54')
+    else:
+        address = ('C8:5C:A2:2B:61:86')
     
     # Create the event loop.
     loop = asyncio.get_event_loop()
-    
+
     # Create the Bluetooth LE object.
     client = BleakClient(address, loop = loop)
     try:
