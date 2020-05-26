@@ -21,13 +21,14 @@ write_characteristic    = '00001142-0000-1000-8000-00805f9b34fb'
 
 # Data
 dump_size               = 256
-column_names            = ['time', 'microphone_value']
+column_names            = ['time', 'micro_secs_since_last', 'microphone_value']
 
 #############
 # Subroutines
 #############
 
 connected = False
+last_packet_time = datetime.now()
 
 def write_to_csv(path, microphone_values, timestamps):
     with open(path, 'a+') as f:
@@ -36,16 +37,21 @@ def write_to_csv(path, microphone_values, timestamps):
             f.write(','.join([str(name) for name in column_names]) + ',\n')  
         else:
             for i in range(len(microphone_values)):
-                f.write(f'{timestamps[i]},{microphone_values[i]},\n')
+                f.write(f'{timestamps[i]},{delays[i]},{microphone_values[i]},\n')
 
 
 def notification_handler(sender, data):
+    global last_packet_time
     value = int.from_bytes(data, byteorder = 'big')
     microphone_values.append(value)
-    timestamps.append(datetime.now())
+    present_time = datetime.now()
+    timestamps.append(present_time)
+    delays.append((present_time - last_packet_time).microseconds)
+    last_packet_time = present_time
     if len(microphone_values) >= dump_size:
         write_to_csv(output_file, microphone_values, timestamps)
         microphone_values.clear()
+        delays.clear()
         timestamps.clear()
 
 
@@ -94,6 +100,7 @@ async def main():
 #############        
 microphone_values = []
 timestamps = []
+delays = []
 
 if __name__ == "__main__":
     import os
