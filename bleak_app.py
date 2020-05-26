@@ -38,20 +38,22 @@ def write_to_csv(path, microphone_values, timestamps):
             for i in range(len(microphone_values)):
                 f.write(f'{timestamps[i]},{microphone_values[i]},\n')
 
+
 def notification_handler(sender, data):
     value = int.from_bytes(data, byteorder = 'big')
     microphone_values.append(value)
     timestamps.append(datetime.now())
     if len(microphone_values) >= dump_size:
         write_to_csv(output_file, microphone_values, timestamps)
-        print('Dumped data...')
         microphone_values.clear()
         timestamps.clear()
+
 
 def disconnect_callback(client, future):
     global connected
     connected = False
     print(f"Disconnected callback called on {client}!")
+
 
 async def cleanup(client):
     await client.stop_notify(read_characteristic)
@@ -65,6 +67,7 @@ async def user_write(client):
         if connected:
             bytes_to_send = bytearray(map(ord, input_str))
             await client.write_gatt_char(write_characteristic,  bytes_to_send)
+            print(f'Sent: {input_str}')
         else:
             print('Not connected.')
 
@@ -72,17 +75,17 @@ async def user_write(client):
 async def run(client):
     global connected
     while True:
-        await client.connect()
-        connected = await client.is_connected()
-        client.set_disconnected_callback(disconnect_callback)
-        await client.start_notify(read_characteristic, notification_handler)
-        while True:
-            await asyncio.sleep(15.0, loop = loop)
+        if not connected:
+            await client.connect()
+            connected = await client.is_connected()
+            client.set_disconnected_callback(disconnect_callback)
+            await client.start_notify(read_characteristic, notification_handler)
+            while True:
+                await asyncio.sleep(15.0, loop = loop)
 
 
 async def main():
     while True:
-        print('Running...')
         await asyncio.sleep(5)
 
 
@@ -115,3 +118,4 @@ if __name__ == "__main__":
     finally:
         print('Disconnecting...')
         loop.run_until_complete(cleanup(client))
+

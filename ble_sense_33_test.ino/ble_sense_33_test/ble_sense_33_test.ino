@@ -13,8 +13,15 @@ BLEService microphoneService("1101");
 
 // Characteristic info.
 // https://www.arduino.cc/en/Reference/ArduinoBLEBLECharacteristicBLECharacteristic
-BLEByteCharacteristic microphoneLevelCharRead("1142", BLEWrite);
-BLEByteCharacteristic microphoneLevelCharWrite("1143", BLERead | BLENotify | BLEBroadcast);
+
+// Setup the incoming data characteristic (RX).
+const int WRITE_BUFFER_SIZE = 256;
+bool WRITE_BUFFER_FIZED_LENGTH = false;
+
+BLECharacteristic rxChar("1142", BLEWriteWithoutResponse | BLEWrite, WRITE_BUFFER_SIZE, WRITE_BUFFER_FIZED_LENGTH);
+
+// Setup the outgoing data characteristic (TX).
+BLEByteCharacteristic txChar("1143", BLERead | BLENotify | BLEBroadcast);
 
 // Buffer to read samples into, each sample is 16-bits
 short sampleBuffer[256];
@@ -23,7 +30,7 @@ short sampleBuffer[256];
 volatile int samplesRead;
 
 /*
- *  Main
+ *  MAIN
  */
 void setup() {
 
@@ -50,12 +57,13 @@ void setup() {
   // Create BLE service and characteristics.
   BLE.setLocalName("MicrophoneMonitor");
   BLE.setAdvertisedService(microphoneService);
-  microphoneService.addCharacteristic(microphoneLevelCharRead);
-  microphoneService.addCharacteristic(microphoneLevelCharWrite);
+  microphoneService.addCharacteristic(rxChar);
+  microphoneService.addCharacteristic(txChar);
   BLE.addService(microphoneService);
 
-  microphoneLevelCharRead.setEventHandler(BLERead, onMicrophoneLevelCharRead);
-
+  // Event driven reads.
+  rxChar.setEventHandler(BLEWritten, onRxCharValueUpdate);
+  
   // Let's tell devices about us.
   BLE.advertise();
   Serial.println("Bluetooth device active, waiting for connections...");
@@ -65,7 +73,7 @@ void setup() {
 void loop()
 {
   BLEDevice central = BLE.central();
-
+  
   if (central)
   {
     Serial.print("Connected to central: ");
@@ -75,25 +83,11 @@ void loop()
     while (central.connected()) {
       connectedLight();
 
-      // Send read request.
-      byte values[256];
-      int numBytes = microphoneLevelCharRead.readValue(values, 256);
-      if(numBytes > 0) {
-        Serial.print("Got #: ");
-        Serial.print(numBytes);
-        Serial.println(" of bytes");
-        for (int i = 0; i < numBytes; i++) {
-          Serial.print(values[i]);
-        }
-      }
-      
-//      Serial.println(microphoneLevelCharRead.value());
-
       // Send the microphone values to the central device.
       if (samplesRead) {
         // print samples to the serial monitor or plotter
         for (int i = 0; i < samplesRead; i++) {
-          microphoneLevelCharWrite.writeValue(sampleBuffer[i]);      
+          txChar.writeValue(sampleBuffer[i]);      
         }
         // Clear the read count
         samplesRead = 0;
@@ -106,7 +100,7 @@ void loop()
 
 
 /*
- * Bluetooth
+ *  BLUETOOTH
  */
 void startBLE() {
   if (!BLE.begin())
@@ -117,15 +111,23 @@ void startBLE() {
   }
 }
 
-void onMicrophoneLevelCharRead(BLEDevice central, BLECharacteristic characteristic) {
+void onRxCharValueUpdate(BLEDevice central, BLECharacteristic characteristic) {
   // central wrote new value to characteristic, update LED
   Serial.print("Characteristic event, read: ");
-  Serial.println(characteristic.value);
+  byte test[256];
+  int dataLength = rxChar.readValue(test, 256);
+
+  for(int i = 0; i < dataLength; i++) {
+    Serial.print((char)test[i]);
+  }
+  Serial.println();
+  Serial.print("Value length = ");
+  Serial.println(rxChar.valueLength());
 }
 
 
 /*
- * Microphone
+ *  MICROPHONE
  */
 void startPDM() {
   // initialize PDM with:
