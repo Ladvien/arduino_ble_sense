@@ -1,8 +1,11 @@
 import logging
+
+
+# https://tutorialedge.net/python/concurrency/asyncio-event-loops-tutorial/
 import asyncio
 import platform
 from datetime import datetime
-
+from aioconsole import ainput
 
 from bleak import BleakClient
 from bleak import _logger as logger
@@ -23,6 +26,9 @@ column_names            = ['time', 'microphone_value']
 #############
 # Subroutines
 #############
+
+connected = False
+
 def write_to_csv(path, microphone_values, timestamps):
     with open(path, 'a+') as f:
         if os.stat(path).st_size == 0:
@@ -43,20 +49,42 @@ def notification_handler(sender, data):
         timestamps.clear()
 
 def disconnect_callback(client, future):
+    global connected
+    connected = False
     print(f"Disconnected callback called on {client}!")
 
 async def cleanup(client):
     await client.stop_notify(read_characteristic)
     await client.disconnect()
+    
+
+async def user_write(client):
+    global connected
+    while True:
+        input_str = await ainput('Enter string: ')
+        if connected:
+            bytes_to_send = bytearray(map(ord, input_str))
+            await client.write_gatt_char(write_characteristic,  bytes_to_send)
+        else:
+            print('Not connected.')
 
 
 async def run(client):
-    await client.connect()
-    await client.is_connected()
-    client.set_disconnected_callback(disconnect_callback)
-    await client.start_notify(read_characteristic, notification_handler)
+    global connected
     while True:
-        await asyncio.sleep(15.0, loop = loop)
+        await client.connect()
+        connected = await client.is_connected()
+        client.set_disconnected_callback(disconnect_callback)
+        await client.start_notify(read_characteristic, notification_handler)
+        while True:
+            await asyncio.sleep(15.0, loop = loop)
+
+
+async def main():
+    while True:
+        print('Running...')
+        await asyncio.sleep(5)
+
 
 #############
 # Main
@@ -77,7 +105,10 @@ if __name__ == "__main__":
     # Create the Bluetooth LE object.
     client = BleakClient(address, loop = loop)
     try:
-        loop.run_until_complete(run(client))
+        asyncio.ensure_future(run(client))
+        asyncio.ensure_future(user_write(client))
+        asyncio.ensure_future(main())
+        loop.run_forever()
     except KeyboardInterrupt:
         print()
         print('User stopped program.')

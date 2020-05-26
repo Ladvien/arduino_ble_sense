@@ -76,18 +76,18 @@ void loop()
       connectedLight();
 
       // Send read request.
-//      byte values[256];
-//      int numBytes = microphoneLevelCharRead.readValue(values, 256);
-//      if(numBytes > 0) {
-//        Serial.print("Got #: ");
-//        Serial.print(numBytes);
-//        Serial.println(" of bytes");
-//        for (int i = 0; i < numBytes; i++) {
-//          Serial.print(values[i]);
-//        }
-//      }
-//      
-      Serial.println(microphoneLevelCharRead.value());
+      byte values[256];
+      int numBytes = microphoneLevelCharRead.readValue(values, 256);
+      if(numBytes > 0) {
+        Serial.print("Got #: ");
+        Serial.print(numBytes);
+        Serial.println(" of bytes");
+        for (int i = 0; i < numBytes; i++) {
+          Serial.print(values[i]);
+        }
+      }
+      
+//      Serial.println(microphoneLevelCharRead.value());
 
       // Send the microphone values to the central device.
       if (samplesRead) {
@@ -120,7 +120,7 @@ void startBLE() {
 void onMicrophoneLevelCharRead(BLEDevice central, BLECharacteristic characteristic) {
   // central wrote new value to characteristic, update LED
   Serial.print("Characteristic event, read: ");
-  Serial.println(microphoneLevelCharRead.value());
+  Serial.println(characteristic.value);
 }
 
 
