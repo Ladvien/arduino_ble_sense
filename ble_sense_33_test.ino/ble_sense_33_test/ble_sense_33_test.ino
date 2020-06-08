@@ -9,7 +9,7 @@
 //#define LEDB        (24u)
 
 // BLE Service
-BLEService microphoneService("1101");
+BLEService microphoneService("00001101-0000-1000-8000-00805f9b34fb");
 
 // Characteristic info.
 // https://www.arduino.cc/en/Reference/ArduinoBLEBLECharacteristicBLECharacteristic
@@ -61,8 +61,16 @@ void setup() {
   microphoneService.addCharacteristic(txChar);
   BLE.addService(microphoneService);
 
+  // Bluetooth LE connection handlers.
+  BLE.setEventHandler(BLEConnected, onBLEConnected);
+  BLE.setEventHandler(BLEDisconnected, onBLEDisconnected);
+  
   // Event driven reads.
   rxChar.setEventHandler(BLEWritten, onRxCharValueUpdate);
+
+  // Print out full UUID.
+  Serial.print("UUID: ");
+  Serial.println(microphoneService.uuid());
   
   // Let's tell devices about us.
   BLE.advertise();
@@ -76,9 +84,6 @@ void loop()
   
   if (central)
   {
-    Serial.print("Connected to central: ");
-    Serial.println(central.address());
-
     // Only send data if we are connected to a central device.
     while (central.connected()) {
       connectedLight();
@@ -107,7 +112,6 @@ void startBLE() {
   {
     Serial.println("starting BLE failed!");
     while (1);
-    disconnectedLight();
   }
 }
 
@@ -123,6 +127,18 @@ void onRxCharValueUpdate(BLEDevice central, BLECharacteristic characteristic) {
   Serial.println();
   Serial.print("Value length = ");
   Serial.println(rxChar.valueLength());
+}
+
+void onBLEConnected(BLEDevice central) {
+  Serial.print("Connected event, central: ");
+  Serial.println(central.address());
+  connectedLight();
+}
+
+void onBLEDisconnected(BLEDevice central) {
+  Serial.print("Disconnected event, central: ");
+  Serial.println(central.address());
+  disconnectedLight();
 }
 
 
