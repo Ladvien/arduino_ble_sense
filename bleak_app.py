@@ -67,25 +67,29 @@ async def cleanup(client):
 async def user_write(client):
     global connected
     while True:
-        input_str = await ainput('Enter string: ')
         if connected:
+            input_str = await ainput('Enter string: ')
             bytes_to_send = bytearray(map(ord, input_str))
             await client.write_gatt_char(write_characteristic,  bytes_to_send)
             print(f'Sent: {input_str}')
         else:
-            print('Not connected.')
+            await asyncio.sleep(15.0, loop = loop)
 
 
 async def run(client):
     global connected
     while True:
         if not connected:
-            await client.connect()
-            connected = await client.is_connected()
-            client.set_disconnected_callback(disconnect_callback)
-            await client.start_notify(read_characteristic, notification_handler)
-            while True:
-                await asyncio.sleep(15.0, loop = loop)
+            try:
+                await client.connect()
+                connected = await client.is_connected()
+                client.set_disconnected_callback(disconnect_callback)
+                await client.start_notify(read_characteristic, notification_handler)
+                while True:
+                    await asyncio.sleep(15.0, loop = loop)
+            except Exception as e:
+                print(e)
+
 
 
 async def main():
