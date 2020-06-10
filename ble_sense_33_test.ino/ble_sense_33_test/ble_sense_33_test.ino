@@ -1,4 +1,7 @@
 // https://rootsaid.com/arduino-ble-example/
+// Characteristic info.
+// https://www.arduino.cc/en/Reference/ArduinoBLEBLECharacteristicBLECharacteristic
+
 #include <ArduinoBLE.h>
 #include <PDM.h>
 
@@ -8,19 +11,18 @@
 //#define LEDG        (22u)
 //#define LEDB        (24u)
 
+// Device name
+const char* nameOfPeripheral = "MicrophoneMonitor";
+
 // BLE Service
 BLEService microphoneService("00001101-0000-1000-8000-00805f9b34fb");
-
-// Characteristic info.
-// https://www.arduino.cc/en/Reference/ArduinoBLEBLECharacteristicBLECharacteristic
 
 // Setup the incoming data characteristic (RX).
 const int WRITE_BUFFER_SIZE = 256;
 bool WRITE_BUFFER_FIZED_LENGTH = false;
 
+// RX / TX Characteristics
 BLECharacteristic rxChar("1142", BLEWriteWithoutResponse | BLEWrite, WRITE_BUFFER_SIZE, WRITE_BUFFER_FIZED_LENGTH);
-
-// Setup the outgoing data characteristic (TX).
 BLEByteCharacteristic txChar("1143", BLERead | BLENotify | BLEBroadcast);
 
 // Buffer to read samples into, each sample is 16-bits
@@ -55,7 +57,7 @@ void setup() {
   startBLE();
 
   // Create BLE service and characteristics.
-  BLE.setLocalName("MicrophoneMonitor");
+  BLE.setLocalName(nameOfPeripheral);
   BLE.setAdvertisedService(microphoneService);
   microphoneService.addCharacteristic(rxChar);
   microphoneService.addCharacteristic(txChar);
@@ -67,13 +69,19 @@ void setup() {
   
   // Event driven reads.
   rxChar.setEventHandler(BLEWritten, onRxCharValueUpdate);
-
-  // Print out full UUID.
-  Serial.print("UUID: ");
-  Serial.println(microphoneService.uuid());
   
   // Let's tell devices about us.
   BLE.advertise();
+  
+  // Print out full UUID and MAC address.
+  Serial.println("Peripheral advertising info: ");
+  Serial.print("Name: ");
+  Serial.println(nameOfPeripheral);
+  Serial.print("UUID: ");
+  Serial.println(microphoneService.uuid());
+  Serial.print("MAC: ");
+  Serial.println(BLE.address());
+
   Serial.println("Bluetooth device active, waiting for connections...");
 }
 
