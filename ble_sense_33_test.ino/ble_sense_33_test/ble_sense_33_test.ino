@@ -13,17 +13,20 @@
 
 // Device name
 const char* nameOfPeripheral = "MicrophoneMonitor";
+const char* uuidOfService = "00001101-0000-1000-8000-00805f9b34fb";
+const char* uuidOfRxChar = "00001142-0000-1000-8000-00805f9b34fb";
+const char* uuidOfTxChar = "00001143-0000-1000-8000-00805f9b34fb";
 
 // BLE Service
-BLEService microphoneService("00001101-0000-1000-8000-00805f9b34fb");
+BLEService microphoneService(uuidOfService);
 
 // Setup the incoming data characteristic (RX).
 const int WRITE_BUFFER_SIZE = 256;
 bool WRITE_BUFFER_FIZED_LENGTH = false;
 
 // RX / TX Characteristics
-BLECharacteristic rxChar("1142", BLEWriteWithoutResponse | BLEWrite, WRITE_BUFFER_SIZE, WRITE_BUFFER_FIZED_LENGTH);
-BLEByteCharacteristic txChar("1143", BLERead | BLENotify | BLEBroadcast);
+BLECharacteristic rxChar(uuidOfRxChar, BLEWriteWithoutResponse | BLEWrite, WRITE_BUFFER_SIZE, WRITE_BUFFER_FIZED_LENGTH);
+BLEByteCharacteristic txChar(uuidOfTxChar, BLERead | BLENotify | BLEBroadcast);
 
 // Buffer to read samples into, each sample is 16-bits
 short sampleBuffer[256];
@@ -77,10 +80,15 @@ void setup() {
   Serial.println("Peripheral advertising info: ");
   Serial.print("Name: ");
   Serial.println(nameOfPeripheral);
-  Serial.print("UUID: ");
-  Serial.println(microphoneService.uuid());
   Serial.print("MAC: ");
   Serial.println(BLE.address());
+  Serial.print("Service UUID: ");
+  Serial.println(microphoneService.uuid());
+  Serial.print("rxCharacteristic UUID: ");
+  Serial.println(uuidOfRxChar);
+  Serial.print("txCharacteristics UUID: ");
+  Serial.println(uuidOfTxChar);
+  
 
   Serial.println("Bluetooth device active, waiting for connections...");
 }
