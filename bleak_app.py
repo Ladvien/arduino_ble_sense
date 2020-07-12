@@ -6,8 +6,13 @@ from datetime import datetime
 from aioconsole import ainput
 
 from bleak import BleakClient
+# Get OS name.
+os_name = sys.platform
 
-root_path = os.environ['HOME']
+if os_name.lower() != "windows":
+    root_path = os.path.expanduser("~user")
+else:
+    root_path = os.environ['HOME']
 
 #############
 # Parameters
@@ -106,13 +111,11 @@ delays = []
 
 if __name__ == "__main__":
 
-    # Get OS name.
-    os_name = sys.platform
-
-    if os_name == 'darwin': # Mac uses CBID.
+    if os_name == 'darwin': # Mac uses CBUUID.
         address = ('C24E11AE-0009-4C5D-9938-6456CBD09A54')
     else:
-        address = ('C8:5C:A2:2B:61:86')
+        # Windows or Linux.
+        address = ('E6:38:7B:5E:A9:24')
     
     # Create the event loop.
     loop = asyncio.get_event_loop()
