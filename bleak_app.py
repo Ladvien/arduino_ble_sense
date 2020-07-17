@@ -15,17 +15,17 @@ column_names = ["time", "micro_secs_since_last", "microphone_value"]
 
 
 class DataToFile:
-    def __init__(self):
-        pass
+    def __init__(self, write_path, column_names):
+        self.path = write_path
 
-    def write_to_csv(self, path: str, microphone_values: list, timestamps: list):
-        with open(path, "a+") as f:
-            if os.stat(path).st_size == 0:
+    def write_to_csv(self, data: tuple):
+        with open(self.path, "a+") as f:
+            if os.stat(self.path).st_size == 0:
                 print("Created file.")
-                f.write(",".join([str(name) for name in column_names]) + ",\n")
+                f.write(",".join([str(name) for name in self.column_names]) + ",\n")
             else:
-                for i in range(len(microphone_values)):
-                    f.write(f"{timestamps[i]},{delays[i]},{microphone_values[i]},\n")
+                for i in range(len(data)):
+                    f.write(f"{timestamps[i]},{delays[i]},{data[i]},\n")
 
 
 class Connection:
@@ -34,23 +34,25 @@ class Connection:
         client: BleakClient,
         read_characteristic: str,
         write_characteristic: str,
-        notification_handler: Callable[[str, Any], None],
+        data_dump_handler: Callable[[str, Any], None],
         data_dump_size: int = 256,
     ):
         self.client = client
         self.read_characteristic = read_characteristic
         self.write_characteristic = write_characteristic
-        self.notification_handler = notification_handler
+        self.data_dump_handler = data_dump_handler
 
-        self.data_to_file = DataToFile()
         self.last_packet_time = datetime.now()
         self.dump_size = data_dump_size
         self.connected = False
 
-    def disconnect_callback(self, client, future):
-        global connected
-        connected = False
-        print(f"Disconnected callback called on {client}!")
+        self.rx_data = []
+        self.rx_timestamps = []
+        self.rx_delays = []
+
+    def disconnect_callback(self, client):
+        self.connected = False
+        print(f"Disconnected from {client}!")
 
     async def cleanup(self):
         await self.client.stop_notify(read_characteristic)
@@ -58,48 +60,51 @@ class Connection:
 
     async def manager(self, client: BleakClient):
         while True:
-            if not await client.is_connected():
+            if not self.connected:
                 try:
+                    await client.connect()
+                    self.connected = await client.is_connected()
                     client.set_disconnected_callback(self.disconnect_callback)
                     await client.start_notify(
-                        self.read_characteristic, self.notification_handler
+                        self.read_characteristic, self.notification_handler,
                     )
                     while True:
                         await asyncio.sleep(15.0, loop=loop)
                 except Exception as e:
                     print(e)
 
+    def record_time_info(self):
+        present_time = datetime.now()
+        self.rx_timestamps.append(present_time)
+        self.rx_delays.append((present_time - self.last_packet_time).microseconds)
+        self.last_packet_time = present_time
 
-def record_time_info(timestamps: list, delays: list):
-    global last_packet_time
-    present_time = datetime.now()
-    timestamps.append(present_time)
-    delays.append((present_time - last_packet_time).microseconds)
-    last_packet_time = present_time
+    def clear_lists(self):
+        self.rx_data.clear()
+        self.rx_delays.clear()
+        self.rx_timestamps.clear()
 
-def clear_lists(microphone_values: list, timestamps: list, delays: list):
-    microphone_values.clear()
-    delays.clear()
-    timestamps.clear()
-
-def notification_handler(sender: str, data: Any):
-    # Convert from byte to int.
-    microphone_values.append(int.from_bytes(data, byteorder="big"))
-    record_time_info()
-    if len(microphone_values) >= dump_size:
-        write_to_csv(output_file, microphone_values, timestamps)
-        clear_lists(microphone_values, timestamps, delays)
+    def notification_handler(self, sender: str, data: Any):
+        self.rx_data.append(int.from_bytes(data, byteorder="big"))
+        self.record_time_info()
+        if len(self.rx_data) >= self.dump_size:
+            data = (self.rx_data, self.rx_timestamps, self.rx_delays)
+            self.data_dump_handler(data)
+            self.clear_lists()
 
 
+#############
+# Loops
+#############
 async def user_console(client: BleakClient, connection: Connection):
     while True:
-        if await client.is_connected():
+        if connection.connected:
             input_str = await ainput("Enter string: ")
             bytes_to_send = bytearray(map(ord, input_str))
             await client.write_gatt_char(write_characteristic, bytes_to_send)
             print(f"Sent: {input_str}")
         else:
-            await asyncio.sleep(15.0, loop=loop)
+            await asyncio.sleep(2.0, loop=loop)
 
 
 async def main():
@@ -116,29 +121,30 @@ write_characteristic = "00001142-0000-1000-8000-00805f9b34fb"
 
 if __name__ == "__main__":
 
-    if sys.platform == 'darwin': 
+    if sys.platform == "darwin":
         # Mac.
-        address = ('C24E11AE-0009-4C5D-9938-6456CBD09A54')
+        address = "46BFEB38-910C-4490-962E-CD60E52D7AF1"
     else:
         # Windows or Linux.
-        address = ('E6:38:7B:5E:A9:24')
-    
+        address = "E6:38:7B:5E:A9:24"
+
     # Create the event loop.
     loop = asyncio.get_event_loop()
-
+    data_to_file = DataToFile(output_file, column_names)
     # Create the Bluetooth LE object.
     client = BleakClient(address, loop=loop)
+
     connection = Connection(
-        client, read_characteristic, write_characteristic, notification_handler
+        client, read_characteristic, write_characteristic, data_to_file.write_to_csv
     )
     try:
         asyncio.ensure_future(connection.manager(client))
-        # asyncio.ensure_future(user_console(client, connection))
-        # asyncio.ensure_future(main())
+        asyncio.ensure_future(user_console(client, connection))
+        asyncio.ensure_future(main())
         loop.run_forever()
     except KeyboardInterrupt:
         print()
         print("User stopped program.")
-    # finally:
-    #     print("Disconnecting...")
-    #     loop.run_until_complete(connection.cleanup())
+    finally:
+        print("Disconnecting...")
+        loop.run_until_complete(connection.cleanup())
