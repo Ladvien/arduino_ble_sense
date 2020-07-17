@@ -116,14 +116,13 @@ write_characteristic = "00001142-0000-1000-8000-00805f9b34fb"
 
 if __name__ == "__main__":
 
-    # Get OS name.
-    os_name = sys.platform
-
-    if os_name == "darwin":  # Mac uses CBID.
-        address = "46BFEB38-910C-4490-962E-CD60E52D7AF1"
+    if sys.platform == 'darwin': 
+        # Mac.
+        address = ('C24E11AE-0009-4C5D-9938-6456CBD09A54')
     else:
-        address = "C8:5C:A2:2B:61:86"
-
+        # Windows or Linux.
+        address = ('E6:38:7B:5E:A9:24')
+    
     # Create the event loop.
     loop = asyncio.get_event_loop()
 
