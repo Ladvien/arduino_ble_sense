@@ -6,7 +6,7 @@ from datetime import datetime
 
 from aioconsole import ainput
 from bleak import BleakClient
-
+import pandas as pd
 from typing import Callable, Any
 
 root_path = os.environ["HOME"]
@@ -17,17 +17,27 @@ column_names = ["time", "micro_secs_since_last", "microphone_value"]
 class DataToFile:
     def __init__(self, write_path, column_names):
         self.path = write_path
+        self.column_names = column_names
 
     def write_to_csv(self, data: tuple):
+        prev_leng = 0
+        for column in data:
+            if len(column) != prev_leng and prev_leng != 0:
+                raise Exception("Not all columns are the same length.")
+            prev_leng = len(column)
+
         with open(self.path, "a+") as f:
             if os.stat(self.path).st_size == 0:
                 print("Created file.")
                 f.write(",".join([str(name) for name in self.column_names]) + ",\n")
             else:
-                for i in range(len(data)):
-                    f.write(f"{timestamps[i]},{delays[i]},{data[i]},\n")
-
-
+                for row_idx in range(len(data[0])):
+                    row = ""
+                    for col_idx in range(len(data)):
+                        row += f"{data[col_idx][row_idx]},"
+                    row += "\n"
+                    f.write(row)
+                        # f.write(f"{timestamps[i]},{delays[i]},{data[i]},\n")
 class Connection:
     def __init__(
         self,
@@ -133,7 +143,6 @@ if __name__ == "__main__":
     data_to_file = DataToFile(output_file, column_names)
     # Create the Bluetooth LE object.
     client = BleakClient(address, loop=loop)
-
     connection = Connection(
         client, read_characteristic, write_characteristic, data_to_file.write_to_csv
     )
