@@ -61,7 +61,7 @@ class Connection:
         self.rx_timestamps = []
         self.rx_delays = []
 
-    def on_disconnect(self, client: BleakClient):
+    def on_disconnect(self, client: BleakClient, future: asyncio.Future):
         self.connected = False
         # Put code here to handle what happens on disconnet.
         print(f"Disconnected from {self.connected_device.name}!")
@@ -93,7 +93,9 @@ class Connection:
                     self.read_characteristic, self.notification_handler,
                 )
                 while True:
-                    await asyncio.sleep(15.0, loop=loop)
+                    if not self.connected:
+                        break
+                    await asyncio.sleep(3.0, loop=loop)
             else:
                 print(f"Failed to connect to {self.connected_device.name}")
         except Exception as e:
